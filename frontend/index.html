@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SmartTask AI</title>
+<style>
+  :root {
+    --bg: #f5f7fb; --card: #ffffff; --text: #1d2433; --muted: #667085;
+    --brand: #4f46e5; --brand-dark: #3f38c4; --border: #e4e7ee;
+    --high: #dc2626; --high-bg: #fef2f2;
+    --med: #d97706;  --med-bg: #fffbeb;
+    --low: #16a34a;  --low-bg: #f0fdf4;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg:#0f1320; --card:#181d2e; --text:#e8ebf5; --muted:#9aa3b8;
+            --border:#2a3148; --high-bg:#2a1518; --med-bg:#2a2112; --low-bg:#10241a; }
+  }
+  * { box-sizing: border-box; }
+  body { margin:0; font-family: "Segoe UI", system-ui, -apple-system, Arial, sans-serif;
+         background: var(--bg); color: var(--text); }
+  header { padding: 40px 20px 10px; text-align: center; }
+  header h1 { margin: 0; font-size: 2.2rem; }
+  header h1 span { color: var(--brand); }
+  header p { color: var(--muted); margin: 8px 0 0; }
+  main { max-width: 980px; margin: 0 auto; padding: 20px; }
+  .card { background: var(--card); border:1px solid var(--border); border-radius: 14px; padding: 20px; }
+  textarea { width:100%; min-height: 120px; padding: 14px; font: inherit; color: var(--text);
+             background: var(--bg); border:1px solid var(--border); border-radius: 10px; resize: vertical; }
+  textarea:focus { outline: 2px solid var(--brand); }
+  .chips { display:flex; flex-wrap:wrap; gap:8px; margin: 12px 0; }
+  .chip { border:1px solid var(--border); background: var(--bg); color: var(--muted);
+          padding: 6px 12px; border-radius: 999px; cursor:pointer; font-size:.85rem; }
+  .chip:hover { border-color: var(--brand); color: var(--brand); }
+  .row { display:flex; gap:10px; align-items:center; flex-wrap:wrap; }
+  button.primary { background: var(--brand); color:#fff; border:0; padding: 12px 24px;
+                   border-radius: 10px; font-size: 1rem; font-weight:600; cursor:pointer; }
+  button.primary:hover { background: var(--brand-dark); }
+  button.primary:disabled { opacity:.6; cursor:wait; }
+  button.ghost { background:none; border:1px solid var(--border); color:var(--text);
+                 padding: 8px 14px; border-radius: 8px; cursor:pointer; }
+  #error { display:none; margin-top:16px; padding:12px 14px; border-radius:10px;
+           background: var(--high-bg); color: var(--high); border:1px solid var(--high); }
+  #results { display:none; margin-top: 24px; }
+  .results-head { display:flex; justify-content:space-between; align-items:center; margin-bottom:12px; }
+  .results-head h2 { margin:0; font-size:1.2rem; }
+  .cols { display:grid; grid-template-columns: repeat(auto-fit, minmax(270px, 1fr)); gap:16px; }
+  .col { border-radius: 14px; padding: 14px; border:1px solid var(--border); }
+  .col h3 { margin: 0 0 10px; font-size: 1rem; display:flex; align-items:center; gap:8px; }
+  .col.High { background: var(--high-bg); } .col.High h3 { color: var(--high); }
+  .col.Medium { background: var(--med-bg); } .col.Medium h3 { color: var(--med); }
+  .col.Low { background: var(--low-bg); } .col.Low h3 { color: var(--low); }
+  .task { background: var(--card); border:1px solid var(--border); border-radius: 10px;
+          padding: 10px 12px; margin-bottom: 10px; }
+  .task label { display:flex; gap:10px; cursor:pointer; font-weight:600; }
+  .task input:checked + span { text-decoration: line-through; opacity:.55; }
+  .due { display:inline-block; font-size:.75rem; background: var(--bg); color: var(--muted);
+         border:1px solid var(--border); padding:2px 8px; border-radius:999px; margin: 6px 0 0 28px; }
+  .reason { font-size:.85rem; color: var(--muted); margin: 6px 0 0 28px; }
+  .empty { color: var(--muted); font-size:.9rem; font-style: italic; }
+  .spinner { width:16px; height:16px; border:3px solid #fff5; border-top-color:#fff;
+             border-radius:50%; display:none; animation: spin .8s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  footer { text-align:center; color: var(--muted); font-size:.8rem; padding: 30px 0; }
+</style>
+</head>
+<body>
+<header>
+  <h1>Smart<span>Task</span> AI</h1>
+  <p>Describe your tasks the way you'd tell a friend. Get an organized, prioritized to-do list.</p>
+</header>
+
+<main>
+  <div class="card">
+    <textarea id="message" placeholder="e.g. I need to finish my assignment tomorrow, buy groceries today, and prepare for my meeting next week."></textarea>
+    <div class="chips" id="chips"></div>
+    <div class="row">
+      <button class="primary row" id="go"><span id="btnText">Organize my tasks</span><span class="spinner" id="spin"></span></button>
+      <button class="ghost" id="clear">Clear</button>
+    </div>
+    <div id="error"></div>
+  </div>
+
+  <section id="results">
+    <div class="results-head">
+      <h2>Your organized to-do list</h2>
+      <button class="ghost" id="copy">Copy as text</button>
+    </div>
+    <div class="cols" id="cols"></div>
+  </section>
+</main>
+<footer>SmartTask AI &middot; LangGraph + Gemini + FastAPI</footer>
+
+<script>
+const EXAMPLES = [
+  "I need to finish my assignment tomorrow, buy groceries today, and prepare for my meeting next week.",
+  "Call the dentist today, pay electricity bill by Friday, and clean my room sometime this month.",
+  "Submit project report tomorrow, gym in the evening, and plan weekend trip next month."
+];
+const $ = id => document.getElementById(id);
+let lastText = "";
+
+EXAMPLES.forEach((ex, i) => {
+  const c = document.createElement("span");
+  c.className = "chip"; c.textContent = "Example " + (i + 1);
+  c.onclick = () => { $("message").value = ex; };
+  $("chips").appendChild(c);
+});
+
+function setLoading(on) {
+  $("go").disabled = on; $("spin").style.display = on ? "inline-block" : "none";
+  $("btnText").textContent = on ? "Thinking..." : "Organize my tasks";
+}
+function showError(msg) { const e = $("error"); e.textContent = msg; e.style.display = "block"; }
+
+function render(tasks) {
+  const cols = $("cols"); cols.innerHTML = "";
+  const icons = { High: "🔴", Medium: "🟡", Low: "🟢" };
+  ["High", "Medium", "Low"].forEach(level => {
+    const col = document.createElement("div"); col.className = "col " + level;
+    const group = tasks.filter(t => t.priority === level);
+    const h = document.createElement("h3");
+    h.textContent = `${icons[level]} ${level} priority (${group.length})`;
+    col.appendChild(h);
+    if (!group.length) {
+      const p = document.createElement("div"); p.className = "empty"; p.textContent = "Nothing here";
+      col.appendChild(p);
+    }
+    group.forEach(t => {
+      const d = document.createElement("div"); d.className = "task";
+      const lab = document.createElement("label");
+      const cb = document.createElement("input"); cb.type = "checkbox";
+      const sp = document.createElement("span"); sp.textContent = t.title;   // textContent: safe from XSS
+      lab.append(cb, sp); d.appendChild(lab);
+      if (t.deadline) { const due = document.createElement("div"); due.className = "due"; due.textContent = "Due: " + t.deadline; d.appendChild(due); }
+      const r = document.createElement("div"); r.className = "reason"; r.textContent = t.reason; d.appendChild(r);
+      col.appendChild(d);
+    });
+    cols.appendChild(col);
+  });
+  $("results").style.display = "block";
+}
+
+$("go").onclick = async () => {
+  const message = $("message").value.trim();
+  $("error").style.display = "none";
+  if (message.length < 3) return showError("Please type your tasks first.");
+  setLoading(true);
+  try {
+    const res = await fetch("/api/organize", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ message })
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(typeof data.detail === "string" ? data.detail : "Request failed");
+    lastText = data.formatted; render(data.tasks);
+  } catch (err) { showError(err.message); }
+  finally { setLoading(false); }
+};
+$("clear").onclick = () => { $("message").value = ""; $("results").style.display = "none"; $("error").style.display = "none"; };
+$("copy").onclick = async () => {
+  try { await navigator.clipboard.writeText(lastText); $("copy").textContent = "Copied!"; }
+  catch { $("copy").textContent = "Copy failed"; }
+  setTimeout(() => $("copy").textContent = "Copy as text", 1500);
+};
+</script>
+</body>
+</html>
