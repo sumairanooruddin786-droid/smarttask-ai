@@ -76,5 +76,5 @@ Response:
 ```
 
 ## Notes
-- Model name is configurable with `GEMINI_MODEL` in `.env` (default `gemini-2.5-flash`). If Google retires a model name, set a current one from https://ai.google.dev/gemini-api/docs/models.
+- Model name is configurable with `GEMINI_MODEL` in `.env` (default `gemini-3.6-flash`). If Google retires a model name, set a current one from https://ai.google.dev/gemini-api/docs/models.
 - Never commit your real `.env` file (it is in `.gitignore`).
